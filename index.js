@@ -25,6 +25,7 @@ function verifyJWT(req, res, next) {
   if (!authHeader) {
     return res.status(401).send('unauthorized access');
   }
+
   const token = authHeader.split(' ')[1];
 
   jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
@@ -41,23 +42,24 @@ async function run() {
     const appointmentOptionCollection = client
       .db('doctorsPortal')
       .collection('appointmentOptions');
-
     const bookingsCollection = client
       .db('doctorsPortal')
       .collection('bookings');
     const usersCollection = client.db('doctorsPortal').collection('users');
-    //!Use Aggregate to query multiple collection and then merge data
+
+    // Use Aggregate to query multiple collection and then merge data
     app.get('/appointmentOptions', async (req, res) => {
       const date = req.query.date;
-      console.log(date);
       const query = {};
       const options = await appointmentOptionCollection.find(query).toArray();
-      // get the bookings for the provided date
+
+      // get the bookings of the provided date
       const bookingQuery = { appointmentDate: date };
       const alreadyBooked = await bookingsCollection
         .find(bookingQuery)
         .toArray();
-      //! code carefully :D
+
+      // code carefully :D
       options.forEach((option) => {
         const optionBooked = alreadyBooked.filter(
           (book) => book.treatment === option.name
@@ -68,7 +70,6 @@ async function run() {
         );
         option.slots = remainingSlots;
       });
-
       res.send(options);
     });
 
@@ -119,16 +120,14 @@ async function run() {
       res.send(options);
     });
 
-    /*
-     *API Naming Convention
-     *
+    /***
+     * API Naming Convention
      * app.get('/bookings')
-     * app.get('/bookings/:id)
+     * app.get('/bookings/:id')
      * app.post('/bookings')
      * app.patch('/bookings/:id')
      * app.delete('/bookings/:id')
-     *
-     * */
+     */
 
     app.get('/bookings', verifyJWT, async (req, res) => {
       const email = req.query.email;
@@ -137,14 +136,15 @@ async function run() {
       if (email !== decodedEmail) {
         return res.status(403).send({ message: 'forbidden access' });
       }
-      const query = { email: email };
 
+      const query = { email: email };
       const bookings = await bookingsCollection.find(query).toArray();
       res.send(bookings);
     });
 
     app.post('/bookings', async (req, res) => {
       const booking = req.body;
+      console.log(booking);
       const query = {
         appointmentDate: booking.appointmentDate,
         email: booking.email,
@@ -152,10 +152,12 @@ async function run() {
       };
 
       const alreadyBooked = await bookingsCollection.find(query).toArray();
+
       if (alreadyBooked.length) {
         const message = `You already have a booking on ${booking.appointmentDate}`;
         return res.send({ acknowledged: false, message });
       }
+
       const result = await bookingsCollection.insertOne(booking);
       res.send(result);
     });
@@ -166,12 +168,11 @@ async function run() {
       const user = await usersCollection.findOne(query);
       if (user) {
         const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
-          expiresIn: '1hr',
+          expiresIn: '1h',
         });
         return res.send({ accessToken: token });
       }
-
-      res.status(403).send({ accessToken: ' ' });
+      res.status(403).send({ accessToken: '' });
     });
 
     app.get('/users', async (req, res) => {
@@ -180,8 +181,16 @@ async function run() {
       res.send(users);
     });
 
+    app.get('/users/admin/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      res.send({ isAdmin: user?.role === 'admin' });
+    });
+
     app.post('/users', async (req, res) => {
       const user = req.body;
+      console.log(user);
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
@@ -190,9 +199,11 @@ async function run() {
       const decodedEmail = req.decoded.email;
       const query = { email: decodedEmail };
       const user = await usersCollection.findOne(query);
+
       if (user?.role !== 'admin') {
         return res.status(403).send({ message: 'forbidden access' });
       }
+
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const options = { upsert: true };
@@ -201,7 +212,6 @@ async function run() {
           role: 'admin',
         },
       };
-
       const result = await usersCollection.updateOne(
         filter,
         updatedDoc,
@@ -212,11 +222,10 @@ async function run() {
   } finally {
   }
 }
-
 run().catch(console.log);
 
 app.get('/', async (req, res) => {
   res.send('doctors portal server is running');
 });
 
-app.listen(port, () => console.log(`Doctors portal running on port ${port}`));
+app.listen(port, () => console.log(`Doctors portal running on ${port}`));
