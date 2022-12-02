@@ -4,6 +4,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const nodemailer = require('nodemailer');
+const mg = require('nodemailer-mailgun-transport');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
@@ -22,7 +23,52 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
-function sendBookingEmail(booking) {}
+function sendBookingEmail(booking) {
+  const { email, treatment, appointmentDate, slot } = booking;
+
+  // This is your API key that you retrieve from www.mailgun.com/cp (free up to 10K monthly emails)
+  const auth = {
+    auth: {
+      api_key: process.env.EMAIL_SEND_KEY,
+      domain: process.env.EMAIL_SEND_DOMAIN,
+    },
+  };
+
+  const transporter = nodemailer.createTransport(mg(auth));
+  // let transporter = nodemailer.createTransport({
+  //   host: 'smtp.sendgrid.net',
+  //   port: 587,
+  //   auth: {
+  //     user: 'apikey',
+  //     pass: process.env.SENDGRID_API_KEY,
+  //   },
+  // });
+
+  transporter.sendMail(
+    {
+      from: 'SENDER_EMAIL', // verified sender email
+      to: email, // recipient email
+      subject: `Your Appointment for ${treatment} is confirmed.`, // Subject line
+      text: 'Hello world!', // plain text body
+      html: `
+      <h3>Your appointment is confirmed</h3>
+      <div>
+      <p>Your appointment for treatment: ${treatment}</p>
+      <p>Please visit us on ${appointmentDate} at ${slot}</p>
+      <p>Thanks from Doctors Portal.</p>
+      </div>
+      
+      `, // html body
+    },
+    function (error, info) {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log('Email sent: ' + info.response);
+      }
+    }
+  );
+}
 
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
