@@ -3,6 +3,7 @@ const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const nodemailer = require('nodemailer');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
@@ -20,6 +21,8 @@ const client = new MongoClient(uri, {
   useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
 });
+
+function sendBookingEmail(booking) {}
 
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -194,6 +197,11 @@ async function run() {
       }
 
       const result = await bookingsCollection.insertOne(booking);
+
+      //send email abput appointment confirmation
+
+      sendBookingEmail(booking);
+
       res.send(result);
     });
 
